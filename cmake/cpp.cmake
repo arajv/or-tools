@@ -13,29 +13,73 @@ if(BUILD_ZLIB)
 else()
  find_package(ZLIB REQUIRED)
 endif()
-find_package(absl REQUIRED CONFIG)
+
+if(BUILD_absl)
+  find_package(absl REQUIRED CONFIG)
+else()
+  find_package(absl REQUIRED)
+endif()
+
 set(GFLAGS_USE_TARGET_NAMESPACE TRUE)
-find_package(gflags REQUIRED CONFIG)
 if(BUILD_gflags)
+  find_package(gflags REQUIRED CONFIG)
   set(GFLAGS_DEP gflags::gflags_static)
 else()
+  find_package(gflags REQUIRED)
   set(GFLAGS_DEP gflags::gflags)
 endif()
-find_package(glog REQUIRED CONFIG)
-find_package(Protobuf REQUIRED CONFIG)
-find_package(CoinUtils REQUIRED CONFIG)
-find_package(Osi REQUIRED CONFIG)
-find_package(Clp REQUIRED CONFIG)
-find_package(Cgl REQUIRED CONFIG)
-find_package(Cbc REQUIRED CONFIG)
+
+if(BUILD_glog)
+  find_package(glog REQUIRED CONFIG)
+else()
+  find_package(glog REQUIRED)
+endif()
+
+if(BUILD_Protobuf)
+  find_package(Protobuf REQUIRED CONFIG)
+else()
+  find_package(Protobuf REQUIRED)
+endif()
+
+if(BUILD_CoinUtils)
+  find_package(CoinUtils REQUIRED CONFIG)
+else()
+  find_package(CoinUtils REQUIRED)
+endif()
+
+if(BUILD_Osi)
+  find_package(Osi REQUIRED CONFIG)
+else()
+  find_package(Osi REQUIRED)
+endif()
+
+if(BUILD_Clp)
+  find_package(Clp REQUIRED CONFIG)
+else()
+  find_package(Clp REQUIRED)
+endif()
+
+if(BUILD_Cgl)
+  find_package(Cgl REQUIRED CONFIG)
+else()
+  find_package(Cgl REQUIRED)
+endif()
+
+if(BUILD_Cbc)
+  find_package(Cbc REQUIRED CONFIG)
+else()
+  find_package(Cbc REQUIRED)
+endif()
 
 # Check optional Dependencies
 if(USE_CPLEX)
   find_package(CPLEX REQUIRED)
 endif()
+
 if(USE_SCIP)
   find_package(SCIP REQUIRED)
 endif()
+
 if(USE_XPRESS)
   find_package(XPRESS REQUIRED)
 endif()
@@ -47,6 +91,30 @@ endif()
 
 # Main Target
 add_library(${PROJECT_NAME} "")
+
+# Includes
+target_include_directories(${PROJECT_NAME} INTERFACE
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
+  $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>
+  $<INSTALL_INTERFACE:include>
+  )
+
+# Compile options
+if(CMAKE_VERSION VERSION_LESS "3.8.2")
+  set_target_properties(${PROJECT_NAME} PROPERTIES
+    CXX_STANDARD 11
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+  )
+else()
+  target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
+endif()
+target_compile_definitions(${PROJECT_NAME} PUBLIC
+  USE_BOP # enable BOP support
+  USE_GLOP # enable GLOP support
+  USE_CBC # enable COIN-OR CBC support
+  USE_CLP # enable COIN-OR CLP support
+  )
 if(USE_CPLEX)
   target_compile_definitions(${PROJECT_NAME} PUBLIC USE_CPLEX)
 endif()
@@ -56,20 +124,27 @@ endif()
 if(USE_XPRESS)
   target_compile_definitions(${PROJECT_NAME} PUBLIC USE_XPRESS)
 endif()
+
+if(WIN32)
+  target_compile_definitions(${PROJECT_NAME} PUBLIC __WIN32__)
+endif()
 if(MSVC)
-  # Allow big object
-  add_definitions(/bigobj)
-  add_definitions(/DNOMINMAX /DWIN32_LEAN_AND_MEAN=1 /D_CRT_SECURE_NO_WARNINGS /D_CRT_SECURE_NO_DEPRECATE)
-  # Build with multiple processes
-  add_definitions(/MP)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE
+    /bigobj # Allow big object
+    /DNOMINMAX
+    /DWIN32_LEAN_AND_MEAN=1
+    /D_CRT_SECURE_NO_WARNINGS
+    /D_CRT_SECURE_NO_DEPRECATE
+    /MP # Build with multiple processes
+    )
   # Prefer /MD over /MT and add NDEBUG in Release
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_definitions(/MDd)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE /MDd)
   else()
-    add_definitions(/MD /DNDEBUG)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE /MD /DNDEBUG)
   endif()
   # MSVC warning suppressions
-  add_definitions(
+  target_compile_definitions(${PROJECT_NAME} PRIVATE
     /wd4005 # 'macro-redefinition'
     /wd4018 # 'expression' : signed/unsigned mismatch
     /wd4065 # switch statement contains 'default' but no 'case' labels
@@ -92,20 +167,10 @@ if(MSVC)
     /wd4996 # The compiler encountered a deprecated declaration.
     )
 else()
-  add_definitions(-fwrapv)
-endif()
-add_definitions(-DUSE_GLOP -DUSE_BOP -DUSE_CBC -DUSE_CLP)
-
-if(CMAKE_VERSION VERSION_LESS "3.8.2")
-  set_target_properties(${PROJECT_NAME} PROPERTIES
-    CXX_STANDARD 11
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-  )
-else()
-  target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE -fwrapv)
 endif()
 
+# Properties
 if(NOT APPLE)
   set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
 else()
@@ -124,11 +189,8 @@ if(APPLE)
     INSTALL_RPATH
     "@loader_path")
 endif()
-target_include_directories(${PROJECT_NAME} INTERFACE
-  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
-  $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>
-  $<INSTALL_INTERFACE:include>
-  )
+
+# Dependencies
 target_link_libraries(${PROJECT_NAME} PUBLIC
   ZLIB::ZLIB
   absl::base
@@ -148,7 +210,6 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   Threads::Threads)
 if(WIN32)
   target_link_libraries(${PROJECT_NAME} PUBLIC psapi.lib ws2_32.lib)
-target_compile_definitions(${PROJECT_NAME} PUBLIC __WIN32__)
 endif()
 if(USE_CPLEX)
   target_link_libraries(${PROJECT_NAME} PUBLIC CPLEX::CPLEX)
@@ -159,9 +220,8 @@ endif()
 if(USE_XPRESS)
   target_link_libraries(${PROJECT_NAME} PUBLIC XPRESS::XPRESS)
 endif()
-target_compile_definitions(${PROJECT_NAME}
-  PUBLIC USE_BOP USE_GLOP USE_CBC USE_CLP)
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
+
+# ALIAS
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
 # Generate Protobuf cpp sources
