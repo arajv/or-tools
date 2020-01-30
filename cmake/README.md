@@ -35,7 +35,8 @@ cd or-tools
 
 2.  Run CMake to configure the build tree.
 ```sh
-cmake -H. -Bbuild -G "Unix Makefiles"
+cmake -H. -Bbuild -G "Unix Makefiles"  [If dependencies have already been installed]
+cmake -H. -Bbuild -G "Unix Makefiles" -DBUILD_DEPS=ON [Installs dependencies too]
 ```
 note: To get the list of available generators (e.g. Visual Studio), use `-G ""`
 
